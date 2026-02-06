@@ -11,6 +11,11 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    },
+    {
+      "src": "https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/512/emoji_u1f408_1f3fe_200d_2b1b.png",
+      "sizes": "512x512",
+      "type": "image/png"
     }
   ]
 }
