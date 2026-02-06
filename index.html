@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Holiday Tracker Pro</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#bb86fc">
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <style>
+        :root { --primary: #bb86fc; --bg: #121212; --card: #1e1e1e; --text: #e0e0e0; --accent: #03dac6; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); display: flex; justify-content: center; padding: 10px; }
+        .card { background: var(--card); padding: 1.5rem; border-radius: 15px; width: 100%; max-width: 500px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); position: relative; }
+        .settings-icon { position: absolute; top: 15px; right: 15px; cursor: pointer; font-size: 1.2rem; opacity: 0.6; }
+        .balance-container { margin-bottom: 10px; border-bottom: 1px solid #333; padding-bottom: 15px; text-align: center; }
+        .balance { font-size: 4rem; font-weight: bold; color: var(--accent); line-height: 1; display: flex; align-items: center; justify-content: center; gap: 15px; }
+        .mascot { font-size: 3rem; filter: drop-shadow(0 0 10px var(--accent)); }
+        select { background: #333; color: white; border: 1px solid var(--primary); padding: 10px; border-radius: 8px; width: 100%; font-size: 1rem; margin-bottom: 15px; }
+        .input-group { background: #252525; padding: 15px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #333; }
+        label { font-size: 0.75rem; color: var(--primary); font-weight: bold; text-transform: uppercase; display: block; margin-bottom: 5px; margin-top: 15px;}
+        label:first-of-type { margin-top: 0; }
+        input[type="text"], input[type="number"] { padding: 12px; border-radius: 8px; border: 1px solid #444; background: #121212; color: white; width: 100%; box-sizing: border-box; font-size: 1rem; }
+        
+        .toggle-section { margin: 15px 0; background: #121212; padding: 12px; border-radius: 8px; border: 1px dashed var(--primary); display: flex; align-items: center; gap: 12px; cursor: pointer; }
+        .toggle-section input { width: 20px; height: 20px; cursor: pointer; accent-color: var(--primary); }
+        .toggle-text { font-size: 0.95rem; color: var(--text); font-weight: 500; }
+
+        .btn-container { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 15px; }
+        button { background: var(--primary); color: black; border: none; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        button:active { transform: scale(0.98); }
+        .accent-btn { background: var(--accent); }
+        .import-btn { background: #333; color: var(--accent); border: 1px solid var(--accent); }
+        .google-btn { background: #4285F4; color: white; grid-column: span 2; margin-top: 5px; }
+        .history-item { display: flex; justify-content: space-between; align-items: center; background: #2c2c2c; margin-bottom: 8px; padding: 12px; border-radius: 8px; border-left: 4px solid var(--accent); }
+        .del-btn { color: #cf6679; cursor: pointer; font-size: 1.5rem; padding: 5px; }
+        #settingsPanel { display: none; background: #333; padding: 15px; border-radius: 10px; margin-bottom: 15px; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <div class="settings-icon" onclick="toggleSettings()">⚙️</div>
+    <div class="balance-container">
+        <h2>Holiday Tracker</h2>
+        <select id="yearSelect" onchange="updateUI()">
+            <option value="2025">Apr 2025 - Mar 2026</option>
+            <option value="2026" selected>Apr 2026 - Mar 2027</option>
+            <option value="2027">Apr 2027 - Mar 2028</option>
+        </select>
+        <div class="balance">
+            <span class="mascot" title="Ozzy Prince of Darkness">🐈‍⬛</span>
+            <span id="balance">30</span>
+        </div>
+        <p style="color: #888; margin: 5px 0 0 0;">Working Days Remaining</p>
+    </div>
+
+    <div id="settingsPanel">
+        <label>Annual Allowance:</label>
+        <input type="number" id="allowanceInput" value="30" onchange="updateAllowance()">
+    </div>
+
+    <div class="input-group">
+        <label>Trip Name</label>
+        <input type="text" id="holidayName" placeholder="e.g., Trip with Lyndsey">
+        
+        <label>Select Date(s)</label>
+        <input type="text" id="datePicker" placeholder="Tap to select dates...">
+
+        <div class="toggle-section" onclick="document.getElementById('halfDayToggle').click()">
+            <input type="checkbox" id="halfDayToggle" onclick="event.stopPropagation()">
+            <span class="toggle-text">Book as a Half Day (0.5)</span>
+        </div>
+        
+        <div class="btn-container">
+            <button onclick="addHoliday()" style="grid-column: span 2; padding: 15px;">Book Holiday</button>
+            <button class="accent-btn" onclick="exportToExcel()">Excel Export</button>
+            <button class="import-btn" onclick="triggerImport()">Excel Import</button>
+            <button class="google-btn" onclick="exportToGoogleCSV()">Google Cal Export</button>
+            <input type="file" id="importFile" style="display:none" onchange="handleImport(event)" accept=".xlsx">
+        </div>
+    </div>
+
+    <div id="logList"></div>
+    <button onclick="resetAll()" style="background:transparent; color:#cf6679; border:1px solid #cf6679; width: 100%; margin-top: 30px; padding: 8px; font-size: 0.7rem;">Wipe All Data</button>
+</div>
+
+<script>
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js');
+    }
+
+    const bankHolidays = ["2026-01-01", "2026-04-03", "2026-04-06", "2026-05-04", "2026-05-25", "2026-08-31", "2026-12-25", "2026-12-28", "2027-01-01", "2027-03-25", "2027-03-29", "2027-05-03", "2027-05-31", "2027-08-30", "2027-12-27", "2027-12-28"];
+    
+    let holidays = JSON.parse(localStorage.getItem('holidayDataFinal_UK_V13')) || [];
+    let allowance = parseFloat(localStorage.getItem('holidayAllowanceFinal_UK_V13')) || 30;
+
+    const fp = flatpickr("#datePicker", { mode: "range", dateFormat: "d-m-Y", theme: "dark", locale: { firstDayOfWeek: 1 } });
+
+    function toggleSettings() { const p = document.getElementById('settingsPanel'); p.style.display = p.style.display === 'block' ? 'none' : 'block'; }
+    function updateAllowance() { allowance = parseFloat(document.getElementById('allowanceInput').value) || 30; localStorage.setItem('holidayAllowanceFinal_UK_V13', allowance); updateUI(); }
+    
+    function parseUKDate(dateStr) {
+        if (!dateStr) return new Date();
+        const [d, m, y] = dateStr.split('-').map(Number);
+        return new Date(y, m - 1, d);
+    }
+
+    function calculateWorkingDays(dates) {
+        if (dates.length === 0) return 0;
+        let start = new Date(dates[0]), end = dates.length > 1 ? new Date(dates[1]) : new Date(dates[0]);
+        let count = 0, d = new Date(start);
+        while (d <= end) {
+            const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            if (d.getDay() !== 0 && d.getDay() !== 6 && !bankHolidays.includes(dateStr)) count++;
+            d.setDate(d.getDate() + 1);
+        }
+        return count;
+    }
+
+    function triggerConfetti() {
+        confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 }, colors: ['#bb86fc', '#03dac6'] });
+    }
+
+    function updateUI() {
+        holidays.sort((a, b) => parseUKDate(a.range.split(" to ")[0]) - parseUKDate(b.range.split(" to ")[0]));
+        const selectedYear = parseInt(document.getElementById('yearSelect').value);
+        const cycleStart = new Date(selectedYear, 3, 1), cycleEnd = new Date(selectedYear + 1, 2, 31);
+        const list = document.getElementById('logList');
+        let taken = 0; list.innerHTML = '';
+        
+        holidays.forEach((h, i) => {
+            const hStart = parseUKDate(h.range.split(" to ")[0]);
+            if (hStart >= cycleStart && hStart <= cycleEnd) {
+                if (isNaN(h.days)) {
+                    const dRange = h.range.split(" to ").map(parseUKDate);
+                    h.days = calculateWorkingDays(dRange);
+                }
+                taken += h.days;
+                list.innerHTML += `
+                <div class="history-item">
+                    <div>
+                        <div style="font-weight:bold; font-size: 1.1rem;">${h.name || 'Holiday'}</div>
+                        <div style="font-size: 0.85rem; opacity: 0.8;">${h.range}</div>
+                        <div style="font-size: 0.8rem; color: var(--accent);">${h.days} working days</div>
+                    </div>
+                    <div class="del-btn" onclick="deleteHoliday(${i})">×</div>
+                </div>`;
+            }
+        });
+        document.getElementById('balance').innerText = (allowance - taken).toFixed(1);
+        localStorage.setItem('holidayDataFinal_UK_V13', JSON.stringify(holidays));
+    }
+
+    function addHoliday() {
+        const d = fp.selectedDates;
+        if (d.length === 0) return alert("Select dates.");
+        const isHalfDay = document.getElementById('halfDayToggle').checked;
+        let days = calculateWorkingDays(d);
+        let name = document.getElementById('holidayName').value.trim() || "Holiday";
+
+        if (isHalfDay) {
+            if (d.length > 1 && d[0].getTime() !== d[1].getTime()) return alert("Select a single date for half-days.");
+            days = 0.5; name += " (Half Day)";
+        }
+
+        holidays.push({ range: document.getElementById('datePicker').value, days: days, name: name });
+        triggerConfetti(); updateUI(); fp.clear(); document.getElementById('holidayName').value = '';
+        document.getElementById('halfDayToggle').checked = false;
+    }
+
+    function deleteHoliday(i) { if(confirm("Remove?")) { holidays.splice(i, 1); updateUI(); } }
+    function exportToExcel() { 
+        const ws = XLSX.utils.json_to_sheet(holidays.map(h => ({ "Trip Name": h.name, "Date Range": h.range, "Working Days Used": h.days })));
+        const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Holidays");
+        XLSX.writeFile(wb, "Holidays.xlsx");
+    }
+    function triggerImport() { document.getElementById('importFile').click(); }
+    function handleImport(e) {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            const wb = XLSX.read(new Uint8Array(ev.target.result), {type: 'array'});
+            const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+            holidays = json.map(r => {
+                let range = r["Date Range"] || r["Range"] || `${r["Start Date"]} to ${r["End Date"]}`;
+                let days = parseFloat(r["Working Days Used"] || r["Days"]);
+                if (isNaN(days)) {
+                    const dParts = range.split(" to ").map(parseUKDate);
+                    days = calculateWorkingDays(dParts);
+                }
+                return { name: r["Trip Name"] || r["Subject"] || "Imported Holiday", range: range, days: days };
+            });
+            updateUI();
+        };
+        reader.readAsArrayBuffer(e.target.files[0]);
+    }
+
+    function exportToGoogleCSV() {
+        let csv = "Subject,Start Date,End Date,All Day Event\n";
+        holidays.forEach(h => {
+            const p = h.range.split(" to "), s = parseUKDate(p[0]), e = p.length > 1 ? parseUKDate(p[1]) : new Date(s);
+            let gEnd = new Date(e); gEnd.setDate(gEnd.getDate() + 1);
+            const sStr = `${s.getFullYear()}-${String(s.getMonth()+1).padStart(2,'0')}-${String(s.getDate()).padStart(2,'0')}`;
+            const eStr = `${gEnd.getFullYear()}-${String(gEnd.getMonth()+1).padStart(2,'0')}-${String(gEnd.getDate()).padStart(2,'0')}`;
+            csv += `"${h.name}",${sStr},${eStr},True\n`;
+        });
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = "google_calendar_holidays.csv"; link.click();
+    }
+
+    function resetAll() { if(confirm("Wipe data?")) { holidays = []; updateUI(); } }
+    updateUI();
+</script>
+</body>
+</html>
